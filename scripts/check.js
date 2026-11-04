@@ -13,7 +13,8 @@ const jsFiles = [
   "tests/transcript-utils.test.js",
   "scripts/runtime-files.js",
   "scripts/build.js",
-  "scripts/set-version.js"
+  "scripts/set-version.js",
+  "scripts/package.js"
 ];
 
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;

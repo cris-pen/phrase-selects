@@ -24,6 +24,7 @@ The sequence path intentionally uses generated subclips as the intermediate repr
 - `tests/transcript-utils.test.js`: Node test for transcript parsing and matching.
 - `scripts/check.js`: Release readiness checks for manifest metadata, version consistency, leftover debug labels, JavaScript syntax, and transcript tests.
 - `scripts/build.js`: Copies only the runtime plugin files into `dist/` for packaging.
+- `scripts/package.js`: Zips `dist/` into the `.ccx` installer in `release/`.
 - `scripts/set-version.js`: Updates the version everywhere it appears.
 - `scripts/runtime-files.js`: Works out which files the plugin needs at runtime (shared by check and build).
 - `RELEASE.md`: Checklist for packaging and publishing a `.ccx` installer.
@@ -43,17 +44,17 @@ The sequence path intentionally uses generated subclips as the intermediate repr
 
 ## Package And Share
 
-For direct distribution, package the plugin as a `.ccx` file with UXP Developer Tool and attach that file to a GitHub Release. A raw source zip is useful for developers, but it is not the installer-style artifact users should double-click.
+For direct distribution, package the plugin as a `.ccx` file and attach that file to a GitHub Release. A raw source zip is useful for developers, but it is not the installer-style artifact users should double-click.
 
-Before packaging, run:
+To build the installer, run:
 
 ```bash
-npm run build
+npm run package
 ```
 
-This runs `npm run check`, then copies only the files the plugin needs into `dist/`: `manifest.json`, the HTML file named by the manifest's `main`, the local scripts and stylesheets that HTML loads, and any icons the manifest lists. Any other runtime file (for example a JSON file loaded with `require()`) must be referenced from `index.html` or added in `scripts/runtime-files.js`, or it will be missing from the `.ccx`; `npm run check` fails if a `.js` file in `src/` is not included. Package from `dist/manifest.json`, not the project folder, so tests, scripts, docs, and `.git` stay out of the installer.
+This runs `npm run check` and `npm run build`, then zips `dist/` into `release/com.crispenstanbach.phrase-selects_premierepro.ccx`. The build step copies only the files the plugin needs into `dist/`: `manifest.json`, the HTML file named by the manifest's `main`, the local scripts and stylesheets that HTML loads, and any icons the manifest lists. Any other runtime file (for example a JSON file loaded with `require()`) must be referenced from `index.html` or added in `scripts/runtime-files.js`, or it will be missing from the `.ccx`; `npm run check` fails if a `.js` file in `src/` is not included. Only `dist/` is packaged, so tests, scripts, docs, and `.git` stay out of the installer.
 
-Then follow `RELEASE.md` to package with UXP Developer Tool, install the generated `.ccx` locally, smoke test it in Premiere, and upload the tested `.ccx` to the GitHub Release.
+Then follow `RELEASE.md` to install the generated `.ccx` locally, smoke test it in Premiere, and upload the tested `.ccx` to the GitHub Release.
 
 ## Source Locking
 
@@ -150,6 +151,7 @@ Use this checklist before UI or creation-flow changes:
 - Each subclip is created as its own Premiere undo step, so large runs take a while and are tedious to undo. Runs with more than 50 matches ask for a second click on Create Outputs before starting.
 - The locked source keeps the transcript it read when it was locked. If you edit the transcript in Premiere, click Use Selected Clip again to pick up the changes.
 - Sequence sources are experimental until verified against real Premiere sequence transcripts and subclip creation.
+- The output sequence uses Premiere's default sequence settings, which may not match the source clip's frame rate or frame size. Change it with Sequence > Sequence Settings if needed.
 - Output names include a run timestamp so repeated searches do not collide with previous generated items.
 - Direct timeline assembly from source clip ranges is a future enhancement.
 - Whole-project, bin-wide, multicam, nested sequence, and fuzzy search support are future enhancements.
@@ -184,11 +186,11 @@ The manifest requires Premiere Pro `26.3.0` because v1 depends on `Transcript.ha
 
 ### Panel Says No Clip Selected
 
-The panel checks Project panel selection first, then every project view selection, then selected timeline clip items in the active sequence, then the active sequence itself. Use the Use Selected Clip button to lock the current source before running a search. Reload the plugin after changing `src/premiere-api.js`, then select exactly one clip, one sequence, or one clip item in the active sequence and lock the source again. Detailed selection diagnostics are written to the UXP Developer Tool console (prefixed `[Phrase Selects]`) rather than shown in the panel.
+The panel checks the active project's Project panel selection first, then (only if that is empty) the selection in each of that project's Project panel views, then selected timeline clip items in the active sequence, then the active sequence itself. Use the Use Selected Clip button to lock the current source before running a search. Reload the plugin after changing `src/premiere-api.js`, then select exactly one clip, one sequence, or one clip item in the active sequence and lock the source again. Detailed selection diagnostics are written to the UXP Developer Tool console (prefixed `[Phrase Selects]`) rather than shown in the panel.
 
 ### Panel Shows An Older Build
 
-The panel header shows the plugin version (for example `v0.1.10`). If it does not match `manifest.json`, remove the plugin from UXP Developer Tool, quit Premiere, reopen Premiere, then add this folder again. The asset URLs include cache-busting query strings, but Premiere can still keep an old plugin process alive until restart.
+The panel header shows the plugin version (for example `v1.0.0`). If it does not match `manifest.json`, remove the plugin from UXP Developer Tool, quit Premiere, reopen Premiere, then add this folder again. The asset URLs include cache-busting query strings, but Premiere can still keep an old plugin process alive until restart.
 
 ## Adobe API Notes
 

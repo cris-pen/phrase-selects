@@ -78,6 +78,51 @@
     return Array.isArray(items) ? items : [];
   }
 
+  function getProjectKey(project) {
+    if (!project) {
+      return "";
+    }
+
+    try {
+      if (project.guid !== undefined && project.guid !== null) {
+        var guid = String(project.guid);
+        if (guid && guid !== "[object Object]") {
+          return "guid:" + guid;
+        }
+      }
+    } catch (error) {
+      // Fall through to path/name.
+    }
+
+    if (project.path) {
+      return "path:" + project.path;
+    }
+
+    return project.name ? "name:" + project.name : "";
+  }
+
+  // True only when Premiere can tell us the view belongs to a different
+  // project than the active one. Unknown means "not from another project",
+  // so older Premiere builds keep the previous fallback behaviour.
+  async function isViewFromOtherProject(ppro, project, viewId) {
+    if (!project || !ppro.ProjectUtils || !isFunction(ppro.ProjectUtils.getProjectFromViewId)) {
+      return false;
+    }
+
+    try {
+      var viewProject = await ppro.ProjectUtils.getProjectFromViewId(viewId);
+      if (!viewProject || viewProject === project) {
+        return false;
+      }
+
+      var viewKey = getProjectKey(viewProject);
+      var activeKey = getProjectKey(project);
+      return Boolean(viewKey && activeKey && viewKey !== activeKey);
+    } catch (error) {
+      return false;
+    }
+  }
+
   async function getSelectedProjectItems(ppro, project) {
     var diagnostics = [];
     var selectedItems = [];
@@ -99,6 +144,16 @@
       logDebug("Project panel selection lookup failed", error);
     }
 
+    // The active project's own selection is authoritative. Only fall back to
+    // individual Project panel views when it is empty; otherwise a selection
+    // left in another open project's panel would be counted too.
+    if (selectedItems.length) {
+      return {
+        items: selectedItems,
+        diagnostics: diagnostics
+      };
+    }
+
     try {
       if (ppro.ProjectUtils && typeof ppro.ProjectUtils.getProjectViewIds === "function") {
         var viewIds = await ppro.ProjectUtils.getProjectViewIds();
@@ -111,6 +166,14 @@
           var viewId = viewIds[index];
 
           try {
+            if (await isViewFromOtherProject(ppro, project, viewId)) {
+              diagnostics.push({
+                source: "ProjectUtils.getSelectionFromViewId[" + index + "]",
+                note: "Skipped: view belongs to another open project"
+              });
+              continue;
+            }
+
             var viewSelection = await ppro.ProjectUtils.getSelectionFromViewId(viewId);
             var viewItems = await getItemsFromProjectSelection(viewSelection);
             diagnostics.push({

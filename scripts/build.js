@@ -32,4 +32,4 @@ console.log("Built Phrase Selects " + manifest.version + " into dist/:");
 files.sort().forEach(function (file) {
   console.log("  " + file);
 });
-console.log("\nNext: in UXP Developer Tool, add dist/manifest.json and choose Package.");
+console.log("\nNext: npm run package to build the .ccx, or load dist/manifest.json in UXP Developer Tool.");

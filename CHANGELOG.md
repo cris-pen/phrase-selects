@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.0
 
 - Fixed Search Transcript silently doing nothing when the search box was empty or a handle value was invalid; the panel now shows the error.
 - Fixed curly apostrophes: transcript words like `don’t` now match `don't` typed in the panel, and vice versa.
@@ -10,8 +10,9 @@
 - Words in scripts with combining marks (for example Hindi) are no longer split into fragments, and accented letters match whether they are stored precomposed or decomposed.
 - Clicking the handle preset that is already active no longer clears the search results.
 - Replaced the debug build labels in the panel header with the plugin version, and moved transcript and selection diagnostics to the developer console.
+- Fixed Use Selected Clip reporting several selected items when more than one project is open; it now uses the active project's selection.
 - Clearer messages when nothing is selected, more than one item is selected, or the clip has no transcript.
-- Added `npm run build` to package only the runtime files from `dist/`, and `npm run set-version` to update the version everywhere at once.
+- Added `npm run package` to build the `.ccx` installer into `release/`, `npm run build` to stage only the runtime files in `dist/`, and `npm run set-version` to update the version everywhere at once.
 - `npm run check` now also fails on version drift and leftover debug labels.
 - Released under the MIT License.
 
