@@ -10,8 +10,10 @@
   }
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   var PREMIERE_TICKS_PER_SECOND = 254016000000;
-  var WORD_RE = createRegex("[\\p{L}\\p{N}'-]+", "gu", /[A-Za-z0-9'-]+/g);
-  var NON_WORD_EDGE_RE = createRegex("^[^\\p{L}\\p{N}]+|[^\\p{L}\\p{N}]+$", "gu", /^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g);
+  // \p{M} keeps combining marks (Hindi matras, decomposed accents, etc.)
+  // inside the word instead of splitting it into fragments.
+  var WORD_RE = createRegex("[\\p{L}\\p{M}\\p{N}'-]+", "gu", /[A-Za-z0-9'-]+/g);
+  var NON_WORD_EDGE_RE = createRegex("^[^\\p{L}\\p{M}\\p{N}]+|[^\\p{L}\\p{M}\\p{N}]+$", "gu", /^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g);
 
   function createRegex(pattern, flags, fallback) {
     try {
@@ -80,13 +82,29 @@
     return "";
   }
 
+  // Curly/typographic apostrophes (’ ‘ ʼ ′ ＇) are folded to a straight
+  // apostrophe so "don’t" in a transcript matches "don't" typed in the panel
+  // (and vice versa when macOS smart quotes rewrite the search box).
+  var APOSTROPHE_VARIANTS_RE = /[‘’ʼ′＇]/g;
+
+  function normalizeApostrophes(text) {
+    var value = String(text || "");
+
+    // NFC so a precomposed "é" and "e" + combining accent compare equal.
+    if (typeof value.normalize === "function") {
+      value = value.normalize("NFC");
+    }
+
+    return value.replace(APOSTROPHE_VARIANTS_RE, "'");
+  }
+
   function tokenizeText(text) {
-    var matches = String(text || "").match(WORD_RE);
+    var matches = normalizeApostrophes(text).match(WORD_RE);
     return matches ? matches : [];
   }
 
   function normalizeToken(token) {
-    return String(token || "")
+    return normalizeApostrophes(token)
       .toLocaleLowerCase()
       .replace(NON_WORD_EDGE_RE, "");
   }

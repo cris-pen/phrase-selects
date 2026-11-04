@@ -1,11 +1,11 @@
 (function (root, factory) {
-  var api = factory(root && root.PhraseSelectsTranscript);
+  var api = factory(root && root.PhraseSelectsTranscript, root);
 
   if (root) {
     root.PhraseSelectsPremiere = api;
   }
-})(typeof globalThis !== "undefined" ? globalThis : this, function (transcriptUtils) {
-  var ADAPTER_VERSION = "create-debug-2026-07-11-01-sequence-source-spacing";
+})(typeof globalThis !== "undefined" ? globalThis : this, function (transcriptUtils, root) {
+  var ADAPTER_VERSION = (root && root.PhraseSelectsVersion) || "";
 
   function getPremiere() {
     if (typeof require !== "function") {
@@ -419,11 +419,18 @@
     logDebug("Selection lookup diagnostics", diagnostics);
 
     if (!selectedItems.length) {
-      throw new Error("no clip selected\n\nSelection diagnostics:\n" + formatSelectionDiagnostics(diagnostics));
+      logDebug("No source found. Selection diagnostics:\n" + formatSelectionDiagnostics(diagnostics));
+      throw new Error(
+        "no clip selected. Select one clip or sequence that has a transcript " +
+        "(in the Project panel or on the timeline), then click Use Selected Clip."
+      );
     }
 
     if (selectedItems.length > 1) {
-      throw new Error("select exactly one clip; found " + selectedItems.length);
+      throw new Error(
+        selectedItems.length + " items are selected. Select exactly one clip or sequence, " +
+        "then click Use Selected Clip."
+      );
     }
 
     var projectItem = selectedItems[0];
@@ -475,7 +482,10 @@
     }
 
     if (!hasTranscript) {
-      throw new Error("selected item has no transcript");
+      throw new Error(
+        "\"" + selection.sourceClipName + "\" has no transcript. " +
+        "Transcribe it in Premiere's Text panel first, then try again."
+      );
     }
 
     try {
@@ -792,6 +802,7 @@
     var searchTerm = options.searchTerm;
     var binName = options.binName;
     var runLabel = options.runLabel || "";
+    var onProgress = isFunction(options.onProgress) ? options.onProgress : null;
 
     if (!hits.length) {
       throw new Error("no matches found");
@@ -803,126 +814,142 @@
     var knownSnapshot = await snapshotProjectItems(project);
     var knownIds = knownSnapshot.ids;
 
-    for (var index = 0; index < hits.length; index += 1) {
-      var hit = hits[index];
-      var subclipName = makeSubclipName(searchTerm, hit, sourceClipName, runLabel);
-      var startTime = ppro.TickTime.createWithSeconds(hit.handleStartSeconds);
-      var endTime = ppro.TickTime.createWithSeconds(hit.handleEndSeconds);
-      var actionClipProjectItem = clipProjectItem;
+    // If a hit fails partway through, stop, but still move the subclips that
+    // were already made into the bin and say how many exist, instead of
+    // leaving them loose in the project with no mention in the error.
+    var loopError = null;
 
-      if (sourceProjectItemId) {
-        var freshSourceProjectItem = await findProjectItemById(project, sourceProjectItemId);
-        if (freshSourceProjectItem) {
-          actionClipProjectItem = castClipProjectItem(ppro, freshSourceProjectItem);
-        } else {
-          logDebug("Could not refresh source clip before subclip action; using previous wrapper", {
-            id: sourceProjectItemId
-          });
-        }
-      }
+    try {
+      for (var index = 0; index < hits.length; index += 1) {
+        var hit = hits[index];
+        reportProgress(onProgress, { current: index + 1, total: hits.length });
+        var subclipName = makeSubclipName(searchTerm, hit, sourceClipName, runLabel);
+        var startTime = ppro.TickTime.createWithSeconds(hit.handleStartSeconds);
+        var endTime = ppro.TickTime.createWithSeconds(hit.handleEndSeconds);
+        var actionClipProjectItem = clipProjectItem;
 
-      if (!(hit.handleEndSeconds > hit.handleStartSeconds)) {
-        throw new Error("subclip creation failed for hit " + padIndex(hit.index) + ": invalid time range");
-      }
-
-      logDebug("Creating subclip", {
-        name: subclipName,
-        startSeconds: hit.handleStartSeconds,
-        endSeconds: hit.handleEndSeconds,
-        startTicks: startTime && startTime.ticks,
-        endTicks: endTime && endTime.ticks
-      });
-
-      try {
-        executeTransactionOrThrow(project, function (compoundAction) {
-          var action = actionClipProjectItem.createSubClipAction(subclipName, startTime, endTime, true, {
-            takeVideo: true,
-            takeAudio: true
-          });
-
-          addActionOrThrow(compoundAction, action, "Create subclip action for " + subclipName);
-        }, "Create Phrase Selects Subclip " + padIndex(hit.index));
-      } catch (error) {
-        var sequenceHint = sourceKind === "sequence" ?
-          " The source is a sequence; if Premiere rejects sequence subclips, this build can still search the sequence transcript but output creation will need a sequence-specific fallback." :
-          "";
-        throw new Error(
-          "subclip creation failed for hit " +
-          padIndex(hit.index) +
-          " (" +
-          hit.handleStartSeconds +
-          "s-" +
-          hit.handleEndSeconds +
-          "s): " +
-          getErrorMessage(error) +
-          sequenceHint
-        );
-      }
-
-      var createdItem = null;
-      var lastSnapshot = null;
-
-      for (var attempt = 0; attempt < 20 && !createdItem; attempt += 1) {
-        lastSnapshot = await snapshotProjectItems(project);
-        createdItem = chooseCreatedProjectItem(lastSnapshot.items, knownIds, subclipName);
-
-        if (!createdItem) {
-          var matchingItems = await collectItemsByName(project, subclipName);
-          var unknownMatchingItems = matchingItems.filter(function (item) {
-            var id = getId(item);
-            return !id || !knownIds[id];
-          });
-          createdItem = unknownMatchingItems.length ? unknownMatchingItems[unknownMatchingItems.length - 1] : null;
-        }
-
-        if (!createdItem) {
-          await sleep(150);
-        }
-      }
-
-      if (!createdItem) {
-        var newItemNames = [];
-
-        if (lastSnapshot) {
-          for (var snapshotIndex = 0; snapshotIndex < lastSnapshot.items.length; snapshotIndex += 1) {
-            var snapshotItem = lastSnapshot.items[snapshotIndex];
-            var snapshotId = getId(snapshotItem);
-            if (snapshotId && !knownIds[snapshotId]) {
-              newItemNames.push(snapshotItem.name || "(unnamed)");
-            }
+        if (sourceProjectItemId) {
+          var freshSourceProjectItem = await findProjectItemById(project, sourceProjectItemId);
+          if (freshSourceProjectItem) {
+            actionClipProjectItem = castClipProjectItem(ppro, freshSourceProjectItem);
+          } else {
+            logDebug("Could not refresh source clip before subclip action; using previous wrapper", {
+              id: sourceProjectItemId
+            });
           }
         }
 
-        throw new Error(
-          "subclip creation failed: generated subclip was not found: " +
-          subclipName +
-          (newItemNames.length ? ". New project items seen: " + newItemNames.join(", ") : ". No new project items were seen.")
-        );
-      }
-
-      if (lastSnapshot) {
-        addSnapshotIds(knownIds, lastSnapshot);
-      } else {
-        var createdId = getId(createdItem);
-        if (createdId) {
-          knownIds[createdId] = true;
+        if (!(hit.handleEndSeconds > hit.handleStartSeconds)) {
+          throw new Error("subclip creation failed for hit " + padIndex(hit.index) + ": invalid time range");
         }
-      }
 
-      if (createdItem.name && createdItem.name !== subclipName) {
-        logDebug("Premiere created subclip with adjusted name", {
+        logDebug("Creating subclip", {
+          name: subclipName,
+          startSeconds: hit.handleStartSeconds,
+          endSeconds: hit.handleEndSeconds,
+          startTicks: startTime && startTime.ticks,
+          endTicks: endTime && endTime.ticks
+        });
+
+        try {
+          executeTransactionOrThrow(project, function (compoundAction) {
+            var action = actionClipProjectItem.createSubClipAction(subclipName, startTime, endTime, true, {
+              takeVideo: true,
+              takeAudio: true
+            });
+
+            addActionOrThrow(compoundAction, action, "Create subclip action for " + subclipName);
+          }, "Create Phrase Selects Subclip " + padIndex(hit.index));
+        } catch (error) {
+          var sequenceHint = sourceKind === "sequence" ?
+            " The source is a sequence; if Premiere rejects sequence subclips, this build can still search the sequence transcript but output creation will need a sequence-specific fallback." :
+            "";
+          throw new Error(
+            "subclip creation failed for hit " +
+            padIndex(hit.index) +
+            " (" +
+            hit.handleStartSeconds +
+            "s-" +
+            hit.handleEndSeconds +
+            "s): " +
+            getErrorMessage(error) +
+            sequenceHint
+          );
+        }
+
+        var createdItem = null;
+        var lastSnapshot = null;
+
+        for (var attempt = 0; attempt < 20 && !createdItem; attempt += 1) {
+          lastSnapshot = await snapshotProjectItems(project);
+          createdItem = chooseCreatedProjectItem(lastSnapshot.items, knownIds, subclipName);
+
+          if (!createdItem) {
+            var matchingItems = await collectItemsByName(project, subclipName);
+            var unknownMatchingItems = matchingItems.filter(function (item) {
+              var id = getId(item);
+              return !id || !knownIds[id];
+            });
+            createdItem = unknownMatchingItems.length ? unknownMatchingItems[unknownMatchingItems.length - 1] : null;
+          }
+
+          if (!createdItem) {
+            await sleep(150);
+          }
+        }
+
+        if (!createdItem) {
+          var newItemNames = [];
+
+          if (lastSnapshot) {
+            for (var snapshotIndex = 0; snapshotIndex < lastSnapshot.items.length; snapshotIndex += 1) {
+              var snapshotItem = lastSnapshot.items[snapshotIndex];
+              var snapshotId = getId(snapshotItem);
+              if (snapshotId && !knownIds[snapshotId]) {
+                newItemNames.push(snapshotItem.name || "(unnamed)");
+              }
+            }
+          }
+
+          throw new Error(
+            "subclip creation failed: generated subclip was not found: " +
+            subclipName +
+            (newItemNames.length ? ". New project items seen: " + newItemNames.join(", ") : ". No new project items were seen.")
+          );
+        }
+
+        if (lastSnapshot) {
+          addSnapshotIds(knownIds, lastSnapshot);
+        } else {
+          var createdId = getId(createdItem);
+          if (createdId) {
+            knownIds[createdId] = true;
+          }
+        }
+
+        if (createdItem.name && createdItem.name !== subclipName) {
+          logDebug("Premiere created subclip with adjusted name", {
+            requestedName: subclipName,
+            actualName: createdItem.name
+          });
+        }
+
+        subclips.push({
+          projectItem: createdItem,
+          name: createdItem.name || subclipName,
           requestedName: subclipName,
-          actualName: createdItem.name
+          hit: hit
         });
       }
-
-      subclips.push({
-        projectItem: createdItem,
-        name: createdItem.name || subclipName,
-        requestedName: subclipName,
-        hit: hit
-      });
+    } catch (error) {
+      loopError = error;
     }
+
+    if (loopError && !subclips.length) {
+      throw loopError;
+    }
+
+    reportProgress(onProgress, { message: "Moving subclips into bin..." });
 
     try {
       outputBin = await createOrFindBin(project, binName);
@@ -952,6 +979,17 @@
     logDebug("Subclip creation results", subclips.map(function (subclip) {
       return { name: subclip.name, id: getId(subclip.projectItem) };
     }));
+
+    if (loopError) {
+      throw new Error(
+        getErrorMessage(loopError) +
+        "\n\n" + subclips.length + " of " + hits.length + " subclips were created before the failure" +
+        (outputBin && !binWarning ?
+          " and are in the bin \"" + binName + "\"." :
+          ". " + (binWarning || "They could not be moved into an output bin.")) +
+        " No sequence was assembled."
+      );
+    }
 
     return {
       bin: outputBin,
@@ -1078,7 +1116,19 @@
     };
   }
 
-  async function createOutputs(preview, settings) {
+  function reportProgress(onProgress, progress) {
+    if (!onProgress) {
+      return;
+    }
+
+    try {
+      onProgress(progress);
+    } catch (error) {
+      logDebug("Progress callback failed", error);
+    }
+  }
+
+  async function createOutputs(preview, settings, onProgress) {
     if (!settings.createSubclips && !settings.createSequence) {
       throw new Error("choose at least one output option");
     }
@@ -1106,11 +1156,14 @@
       sourceClipName: selection.sourceClipName,
       searchTerm: settings.searchTerm,
       binName: binName,
-      runLabel: runLabel
+      runLabel: runLabel,
+      onProgress: onProgress
     });
     var sequence = null;
 
     if (settings.createSequence) {
+      reportProgress(isFunction(onProgress) ? onProgress : null, { message: "Assembling sequence..." });
+
       try {
         sequence = await createSequenceFromSubclips({
           project: selection.project,

@@ -17,11 +17,15 @@ The sequence path intentionally uses generated subclips as the intermediate repr
 - `manifest.json`: UXP manifest for Premiere Pro 26.3 or newer.
 - `index.html`: Panel markup.
 - `styles.css`: Panel styling.
+- `src/version.js`: Single source of the version shown in the panel.
 - `src/main.js`: UI event handling.
 - `src/transcript-utils.js`: Transcript parsing and phrase matching.
 - `src/premiere-api.js`: Isolated Premiere UXP API calls.
 - `tests/transcript-utils.test.js`: Node test for transcript parsing and matching.
-- `scripts/check.js`: Release readiness checks for manifest metadata, JavaScript syntax, and transcript tests.
+- `scripts/check.js`: Release readiness checks for manifest metadata, version consistency, leftover debug labels, JavaScript syntax, and transcript tests.
+- `scripts/build.js`: Copies only the runtime plugin files into `dist/` for packaging.
+- `scripts/set-version.js`: Updates the version everywhere it appears.
+- `scripts/runtime-files.js`: Works out which files the plugin needs at runtime (shared by check and build).
 - `RELEASE.md`: Checklist for packaging and publishing a `.ccx` installer.
 - `CHANGELOG.md`: Versioned release notes.
 
@@ -44,8 +48,10 @@ For direct distribution, package the plugin as a `.ccx` file with UXP Developer 
 Before packaging, run:
 
 ```bash
-npm run check
+npm run build
 ```
+
+This runs `npm run check`, then copies only the files the plugin needs into `dist/`: `manifest.json`, the HTML file named by the manifest's `main`, the local scripts and stylesheets that HTML loads, and any icons the manifest lists. Any other runtime file (for example a JSON file loaded with `require()`) must be referenced from `index.html` or added in `scripts/runtime-files.js`, or it will be missing from the `.ccx`; `npm run check` fails if a `.js` file in `src/` is not included. Package from `dist/manifest.json`, not the project folder, so tests, scripts, docs, and `.git` stay out of the installer.
 
 Then follow `RELEASE.md` to package with UXP Developer Tool, install the generated `.ccx` locally, smoke test it in Premiere, and upload the tested `.ccx` to the GitHub Release.
 
@@ -143,6 +149,8 @@ Use this checklist before UI or creation-flow changes:
 - Multi-phrase `AND` matching expects phrases to appear in order and within roughly 12 seconds of each other.
 - Whole-word mode is enabled by default. Disabling it currently allows partial matches for single-word searches.
 - Uses subclips even when only a continuous sequence is requested.
+- Each subclip is created as its own Premiere undo step, so large runs take a while and are tedious to undo. Runs with more than 50 matches ask for a second click on Create Outputs before starting.
+- The locked source keeps the transcript it read when it was locked. If you edit the transcript in Premiere, click Use Selected Clip again to pick up the changes.
 - Sequence sources are experimental until verified against real Premiere sequence transcripts and subclip creation.
 - Output names include a run timestamp so repeated searches do not collide with previous generated items.
 - Direct timeline assembly from source clip ranges is a future enhancement.
@@ -154,6 +162,12 @@ Run the release readiness check:
 
 ```bash
 npm run check
+```
+
+Change the version everywhere at once (manifest, package.json, `src/version.js`, and `index.html`):
+
+```bash
+npm run set-version -- 1.0.0
 ```
 
 Run the pure JavaScript transcript tests:
@@ -172,11 +186,11 @@ The manifest requires Premiere Pro `26.3.0` because v1 depends on `Transcript.ha
 
 ### Panel Says No Clip Selected
 
-The panel checks Project panel selection first, then every project view selection, then selected timeline clip items in the active sequence, then the active sequence itself. Use the Use Selected Clip button to lock the current source before running a search. Reload the plugin after changing `src/premiere-api.js`, then select exactly one clip, one sequence, or one clip item in the active sequence and lock the source again.
+The panel checks Project panel selection first, then every project view selection, then selected timeline clip items in the active sequence, then the active sequence itself. Use the Use Selected Clip button to lock the current source before running a search. Reload the plugin after changing `src/premiere-api.js`, then select exactly one clip, one sequence, or one clip item in the active sequence and lock the source again. Detailed selection diagnostics are written to the UXP Developer Tool console (prefixed `[Phrase Selects]`) rather than shown in the panel.
 
 ### Panel Shows An Older Build
 
-The panel header includes both a JavaScript adapter version and an HTML build line. If the displayed version does not match the current files, remove the plugin from UXP Developer Tool, quit Premiere, reopen Premiere, then add this folder again. The asset URLs include cache-busting query strings, but Premiere can still keep an old plugin process alive until restart.
+The panel header shows the plugin version (for example `v0.1.10`). If it does not match `manifest.json`, remove the plugin from UXP Developer Tool, quit Premiere, reopen Premiere, then add this folder again. The asset URLs include cache-busting query strings, but Premiere can still keep an old plugin process alive until restart.
 
 ## Adobe API Notes
 

@@ -1,11 +1,30 @@
 (function () {
   var transcript = globalThis.PhraseSelectsTranscript;
   var premiere = globalThis.PhraseSelectsPremiere;
-  var UI_VERSION = "create-debug-2026-07-11-01-sequence-source-spacing";
+  var APP_VERSION = globalThis.PhraseSelectsVersion || "";
   var HANDLE_DEFAULT_KEY = "phrase-selects-default-handles-v1";
+  // Runs with more hits than this need a second click on Create Outputs,
+  // because each subclip is created (and undone) individually in Premiere.
+  var LARGE_RUN_THRESHOLD = 50;
+  var CREATE_BUTTON_LABEL = "Create Outputs";
   var currentPreview = null;
   var previewSignature = "";
   var sourceContext = null;
+  var confirmPending = false;
+  var confirmRequestedAt = 0;
+  // A second activation sooner than this after the prompt appears is treated
+  // as part of the same double-click / key repeat, not as a confirmation.
+  var CONFIRM_MIN_DELAY_MS = 700;
+  var LOAD_FAILED_MESSAGE = "Phrase Selects did not load completely. Close and reopen the panel, or reinstall the plugin.";
+  var loadFailed = false;
+
+  function logDebug(message, payload) {
+    if (payload !== undefined) {
+      console.log("[Phrase Selects] " + message, payload);
+    } else {
+      console.log("[Phrase Selects] " + message);
+    }
+  }
 
   function getElement(id) {
     return document.getElementById(id);
@@ -36,6 +55,10 @@
   }
 
   function setBusy(isBusy) {
+    if (loadFailed) {
+      return;
+    }
+
     setActionDisabled("lockSourceButton", isBusy);
     setActionDisabled("previewButton", isBusy);
     setActionDisabled("createButton", isBusy || !currentPreview);
@@ -137,7 +160,7 @@
 
   function applyHandlePreset(before, after, announce) {
     setHandleValues(before, after);
-    clearPreview();
+    clearPreviewIfStale();
 
     if (announce) {
       setStatus("Handles set to " + Number(before).toFixed(2) + " / " + Number(after).toFixed(2) + ".");
@@ -174,8 +197,53 @@
   function clearPreview() {
     currentPreview = null;
     previewSignature = "";
+    resetCreateConfirmation();
     setActionDisabled("createButton", true);
     renderMatches([]);
+  }
+
+  // Input/change events also fire when nothing relevant changed (for example
+  // the delayed "change" when focus leaves the search box after Enter), so
+  // only drop the results if the search settings really differ.
+  function clearPreviewIfStale() {
+    if (currentPreview && previewSignature === getPreviewSignature(getSettings())) {
+      return;
+    }
+
+    var hadResults = Boolean(currentPreview);
+    clearPreview();
+
+    if (hadResults) {
+      setStatus("Search settings changed. Search again to update the matches.");
+    }
+  }
+
+  function resetCreateConfirmation() {
+    var button = getOptionalElement("createButton");
+    confirmPending = false;
+    confirmRequestedAt = 0;
+
+    if (button) {
+      button.classList.remove("is-confirming");
+      button.textContent = CREATE_BUTTON_LABEL;
+    }
+  }
+
+  function requestCreateConfirmation(hitCount) {
+    var button = getOptionalElement("createButton");
+    confirmPending = true;
+    confirmRequestedAt = Date.now();
+
+    if (button) {
+      button.classList.add("is-confirming");
+      button.textContent = "Click again to create " + hitCount + " subclips";
+    }
+
+    setStatus(
+      "This search has " + hitCount + " matches. Creating them can take a while, " +
+      "and each subclip is a separate undo step in Premiere.\n" +
+      "Click Create Outputs again to continue, or narrow the search."
+    );
   }
 
   function rememberSourceContext(preview) {
@@ -296,9 +364,18 @@
 
   async function runPreview() {
     var settings = getSettings();
-    validateSettings(settings, false);
+
+    try {
+      validateSettings(settings, false);
+    } catch (validationError) {
+      clearPreview();
+      setStatus(capitalize(validationError.message || String(validationError)) + ".", true);
+      return;
+    }
+
+    resetCreateConfirmation();
     setBusy(true);
-    setStatus(sourceContext ? "Searching stored source transcript..." : "Reading selected clip transcript...");
+    setStatus(sourceContext ? "Searching locked source transcript..." : "Reading selected clip transcript...");
 
     try {
       var preview = sourceContext ? buildPreviewFromSourceContext(settings) : await premiere.previewMatches(settings);
@@ -308,11 +385,11 @@
       getElement("selectedClipName").textContent = preview.sourceClipName;
       renderMatches(preview.hits);
       setStatus("Found " + preview.hits.length + " match" + (preview.hits.length === 1 ? "." : "es."));
-      appendStatus("Transcript words parsed: " + preview.words.length);
-      appendStatus("Transcript shape keys: " + (preview.shapeKeys.length ? preview.shapeKeys.join(", ") : "unknown"));
+      logDebug("Transcript words parsed", preview.words.length);
+      logDebug("Transcript shape keys", preview.shapeKeys);
     } catch (error) {
       clearPreview();
-      setStatus(error.message || String(error), true);
+      setStatus(capitalize(error.message || String(error)), true);
     } finally {
       setBusy(false);
     }
@@ -333,10 +410,10 @@
       getElement("selectedClipName").textContent = context.sourceClipName;
       updateSourceView();
       setStatus("Source locked: " + context.sourceClipName + ".");
-      appendStatus("Transcript shape keys: " + (context.shapeKeys && context.shapeKeys.length ? context.shapeKeys.join(", ") : "unknown"));
+      logDebug("Transcript shape keys", context.shapeKeys);
     } catch (error) {
       updateSourceView();
-      setStatus(error.message || String(error), true);
+      setStatus(capitalize(error.message || String(error)), true);
     } finally {
       setBusy(false);
     }
@@ -350,11 +427,32 @@
       throw new Error("run search again before creating outputs");
     }
 
+    var hitCount = currentPreview.hits.length;
+
+    if (hitCount > LARGE_RUN_THRESHOLD) {
+      if (!confirmPending) {
+        requestCreateConfirmation(hitCount);
+        return;
+      }
+
+      if (Date.now() - confirmRequestedAt < CONFIRM_MIN_DELAY_MS) {
+        // Second half of a double-click or a held key: keep the prompt up.
+        return;
+      }
+    }
+
+    resetCreateConfirmation();
     setBusy(true);
     setStatus("Creating outputs...");
 
     try {
-      var result = await premiere.createOutputs(currentPreview, settings);
+      var result = await premiere.createOutputs(currentPreview, settings, function (progress) {
+        if (progress && progress.total) {
+          setStatus("Creating subclip " + progress.current + " of " + progress.total + "...");
+        } else if (progress && progress.message) {
+          setStatus(progress.message);
+        }
+      });
       setStatus("Created " + result.subclipCount + " subclip" + (result.subclipCount === 1 ? "" : "s") + ".");
       appendStatus((result.binAvailable ? "Bin: " : "Bin skipped: ") + result.binName);
 
@@ -366,7 +464,7 @@
         appendStatus("Sequence: " + result.sequenceName);
       }
     } catch (error) {
-      setStatus(error.message || String(error), true);
+      setStatus(capitalize(error.message || String(error)), true);
     } finally {
       setBusy(false);
     }
@@ -376,11 +474,7 @@
     bindAction("lockSourceButton", runSourceLock);
     bindAction("previewButton", runPreview);
     bindAction("saveHandleDefaultButton", saveHandleDefault);
-    bindAction("createButton", function () {
-      runCreate().catch(function (error) {
-        setStatus(error.message || String(error), true);
-      });
-    });
+    bindAction("createButton", runCreate);
 
     var presetButtons = document.querySelectorAll(".preset-button[data-before][data-after]");
 
@@ -398,20 +492,68 @@
     }
 
     ["searchTerm", "wholeWordOnly"].forEach(function (id) {
-      getElement(id).addEventListener("input", clearPreview);
-      getElement(id).addEventListener("change", clearPreview);
+      getElement(id).addEventListener("input", clearPreviewIfStale);
+      getElement(id).addEventListener("change", clearPreviewIfStale);
+    });
+
+    // Output options do not change the matches, but they do change what a
+    // pending large-run confirmation would create, so ask again.
+    ["createSubclips", "createSequence"].forEach(function (id) {
+      getElement(id).addEventListener("change", function () {
+        if (confirmPending) {
+          resetCreateConfirmation();
+          setStatus("Output options changed. Click Create Outputs to continue.");
+        }
+      });
+    });
+
+    getElement("searchTerm").addEventListener("keydown", function (event) {
+      if (event.key === "Enter" && !event.repeat && !isActionDisabled("previewButton")) {
+        event.preventDefault();
+        invokeAction(runPreview);
+      }
     });
 
     ["handleBefore", "handleAfter"].forEach(function (id) {
       getElement(id).addEventListener("input", function () {
-        clearPreview();
+        clearPreviewIfStale();
         updatePresetView();
       });
       getElement(id).addEventListener("change", function () {
-        clearPreview();
+        clearPreviewIfStale();
         updatePresetView();
       });
     });
+  }
+
+  function capitalize(message) {
+    var text = String(message || "");
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+  }
+
+  // Every action goes through here so a thrown error or rejected promise is
+  // always shown in the status area instead of disappearing silently.
+  function invokeAction(handler) {
+    var result;
+
+    if (loadFailed) {
+      setStatus(LOAD_FAILED_MESSAGE, true);
+      return;
+    }
+
+    try {
+      result = handler();
+    } catch (error) {
+      setStatus(capitalize(error.message || String(error)), true);
+      return;
+    }
+
+    if (result && typeof result.then === "function") {
+      result.then(null, function (error) {
+        setBusy(false);
+        setStatus(capitalize(error && error.message ? error.message : String(error)), true);
+      });
+    }
   }
 
   function bindAction(id, handler) {
@@ -423,25 +565,51 @@
 
     element.addEventListener("click", function () {
       if (!isActionDisabled(id)) {
-        handler();
+        invokeAction(handler);
       }
     });
 
     element.addEventListener("keydown", function (event) {
+      if (event.repeat) {
+        return;
+      }
+
       if ((event.key === "Enter" || event.key === " ") && !isActionDisabled(id)) {
         event.preventDefault();
-        handler();
+        invokeAction(handler);
       }
     });
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    getElement("adapterVersion").textContent = "UI " + UI_VERSION + " / API " + (premiere && premiere.version ? premiere.version : "not loaded");
+    var versionLabel = getOptionalElement("appVersion");
+
+    if (versionLabel) {
+      versionLabel.textContent = APP_VERSION ? "v" + APP_VERSION : "";
+    }
+
     var defaultHandles = getDefaultHandles();
     setHandleValues(defaultHandles.before, defaultHandles.after);
     bindEvents();
     updateSourceView();
     renderMatches([]);
+
+    if (!premiere || !transcript) {
+      setActionDisabled("lockSourceButton", true);
+      setActionDisabled("previewButton", true);
+      setActionDisabled("createButton", true);
+      loadFailed = true;
+      setStatus(LOAD_FAILED_MESSAGE, true);
+      return;
+    }
+
+    if (premiere.version && APP_VERSION && premiere.version !== APP_VERSION) {
+      logDebug("Version mismatch between panel and Premiere adapter", {
+        panel: APP_VERSION,
+        adapter: premiere.version
+      });
+    }
+
     setStatus("Ready.");
   });
 })();

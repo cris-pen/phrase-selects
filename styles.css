@@ -447,3 +447,14 @@ input[type="checkbox"] {
     margin-left: 0;
   }
 }
+
+.action-button.is-confirming {
+  border-color: var(--danger);
+  background: var(--danger);
+}
+
+.action-button.is-confirming:hover {
+  border-color: var(--danger);
+  background: var(--danger);
+  opacity: 0.9;
+}

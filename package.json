@@ -5,7 +5,9 @@
   "description": "Premiere Pro UXP panel for creating phrase-based selects from transcripts.",
   "scripts": {
     "check": "node scripts/check.js",
-    "test": "node tests/transcript-utils.test.js"
+    "test": "node tests/transcript-utils.test.js",
+    "build": "node scripts/check.js && node scripts/build.js",
+    "set-version": "node scripts/set-version.js"
   },
   "keywords": [
     "premiere-pro",
