@@ -13,6 +13,7 @@
 - Clearer messages when nothing is selected, more than one item is selected, or the clip has no transcript.
 - Added `npm run build` to package only the runtime files from `dist/`, and `npm run set-version` to update the version everywhere at once.
 - `npm run check` now also fails on version drift and leftover debug labels.
+- Released under the MIT License.
 
 ## 0.1.10
 

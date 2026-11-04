@@ -55,8 +55,6 @@ This runs `npm run check`, then copies only the files the plugin needs into `dis
 
 Then follow `RELEASE.md` to package with UXP Developer Tool, install the generated `.ccx` locally, smoke test it in Premiere, and upload the tested `.ccx` to the GitHub Release.
 
-Before making the repository public, choose a license and add a `LICENSE` file.
-
 ## Source Locking
 
 The panel locks the searched source and transcript until Use Selected Clip is clicked again. This lets repeated searches keep using the original clip or sequence even after Premiere focuses a generated selects sequence.
@@ -218,3 +216,7 @@ The most likely live-testing adjustment is transcript JSON parsing, since export
 - [ClipProjectItem API](https://developer.adobe.com/premiere-pro/uxp/ppro-reference/classes/clipprojectitem)
 - [Sequence API](https://developer.adobe.com/premiere-pro/uxp/ppro-reference/classes/sequence)
 - [SequenceEditor API](https://developer.adobe.com/premiere-pro/uxp/ppro-reference/classes/sequenceeditor)
+
+## License
+
+Phrase Selects is released under the [MIT License](LICENSE).
