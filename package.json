@@ -1,0 +1,17 @@
+{
+  "name": "phrase-selects",
+  "version": "0.1.10",
+  "private": true,
+  "description": "Premiere Pro UXP panel for creating phrase-based selects from transcripts.",
+  "scripts": {
+    "check": "node scripts/check.js",
+    "test": "node tests/transcript-utils.test.js"
+  },
+  "keywords": [
+    "premiere-pro",
+    "uxp",
+    "transcript",
+    "subclips",
+    "video-editing"
+  ]
+}

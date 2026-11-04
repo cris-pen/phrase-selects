@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Phrase Selects</title>
+    <link rel="stylesheet" href="styles.css?v=0.1.10-sequence-source-spacing" />
+  </head>
+  <body>
+    <main class="panel-shell">
+      <header class="panel-header">
+        <h1>Phrase Selects</h1>
+        <p id="selectedClipName" class="clip-name">No clip selected</p>
+        <p id="adapterVersion" class="adapter-version">Adapter loading...</p>
+        <p id="htmlBuild" class="adapter-version">Build 0.1.10-sequence-source-spacing</p>
+      </header>
+
+      <section id="sourcePanel" class="source-panel is-unlocked">
+        <div class="source-copy">
+          <span class="source-label">Source</span>
+          <strong id="sourceName" class="source-name">Unlocked</strong>
+          <span id="sourceDetail" class="source-detail">Current Premiere selection</span>
+        </div>
+        <div id="lockSourceButton" class="source-button" role="button" tabindex="0">Use Selected Clip</div>
+      </section>
+
+      <section class="section-group">
+        <div class="section-heading">Search</div>
+        <div class="control-group">
+          <label for="searchTerm">Words or phrases</label>
+          <input id="searchTerm" type="text" placeholder="cheese, bread | cheese + bread" />
+        </div>
+        <section class="action-row primary-actions">
+          <div id="previewButton" class="action-button" role="button" tabindex="0">Search Transcript</div>
+        </section>
+      </section>
+
+      <section class="section-group">
+        <div class="section-heading">Handles</div>
+        <section class="time-grid">
+          <div class="control-group">
+            <label for="handleBefore">Before</label>
+            <input id="handleBefore" type="number" min="0" step="0.05" value="0.00" />
+          </div>
+          <div class="control-group">
+            <label for="handleAfter">After</label>
+            <input id="handleAfter" type="number" min="0" step="0.05" value="0.00" />
+          </div>
+        </section>
+
+        <section class="handle-presets" aria-label="Handle presets">
+          <div class="preset-button" role="button" tabindex="0" data-before="0" data-after="0">0 / 0</div>
+          <div class="preset-button" role="button" tabindex="0" data-before="0.25" data-after="0.5">0.25 / 0.5</div>
+          <div class="preset-button" role="button" tabindex="0" data-before="0.5" data-after="1">0.5 / 1</div>
+          <div class="preset-button" role="button" tabindex="0" data-before="1" data-after="1">1 / 1</div>
+          <div id="saveHandleDefaultButton" class="preset-button preset-default-button" role="button" tabindex="0">Set Default</div>
+        </section>
+      </section>
+
+      <section class="section-group">
+        <div class="section-heading">Output</div>
+        <section class="checkbox-stack">
+          <label>
+            <input id="wholeWordOnly" type="checkbox" checked />
+            Whole word only
+          </label>
+          <label>
+            <input id="createSubclips" type="checkbox" checked />
+            Create subclips
+          </label>
+          <label>
+            <input id="createSequence" type="checkbox" checked />
+            Create continuous sequence
+          </label>
+        </section>
+      </section>
+
+      <section class="action-row">
+        <div id="createButton" class="action-button is-disabled" role="button" tabindex="0" aria-disabled="true">Create Outputs</div>
+      </section>
+
+      <section class="results-shell" aria-live="polite">
+        <div class="results-header">
+          <h2>Matches</h2>
+          <span id="matchCount">0</span>
+        </div>
+        <ol id="resultsList" class="results-list"></ol>
+      </section>
+
+      <pre id="statusOutput" class="status-output">Ready.</pre>
+    </main>
+
+    <script src="src/transcript-utils.js?v=0.1.10-sequence-source-spacing"></script>
+    <script src="src/premiere-api.js?v=0.1.10-sequence-source-spacing"></script>
+    <script src="src/main.js?v=0.1.10-sequence-source-spacing"></script>
+  </body>
+</html>
