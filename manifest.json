@@ -8,6 +8,16 @@
     "app": "premierepro",
     "minVersion": "26.3.0"
   },
+  "icons": [
+    {
+      "width": 24,
+      "height": 24,
+      "path": "icons/plugin.png",
+      "scale": [1, 2],
+      "theme": ["all"],
+      "species": ["pluginList"]
+    }
+  ],
   "entrypoints": [
     {
       "type": "panel",

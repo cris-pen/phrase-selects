@@ -27,6 +27,8 @@ The sequence path intentionally uses generated subclips as the intermediate repr
 - `scripts/package.js`: Zips `dist/` into the `.ccx` installer in `release/`.
 - `scripts/set-version.js`: Updates the version everywhere it appears.
 - `scripts/runtime-files.js`: Works out which files the plugin needs at runtime (shared by check and build).
+- `icons/`: Plugin icon PNGs referenced by `manifest.json` (24 px and 48 px).
+- `design/icon/`: Icon source artwork (SVG master, 512 px PNG for listings, and a one-color 24 px glyph). Not shipped in the plugin.
 - `RELEASE.md`: Checklist for packaging and publishing a `.ccx` installer.
 - `CHANGELOG.md`: Versioned release notes.
 

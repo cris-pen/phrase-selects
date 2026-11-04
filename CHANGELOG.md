@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Added the plugin icon (shown in Creative Cloud's plugin list and Premiere's plugin manager). Source artwork is in `design/icon/`.
+
 ## 1.0.0
 
 - Fixed Search Transcript silently doing nothing when the search box was empty or a handle value was invalid; the panel now shows the error.
