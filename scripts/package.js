@@ -2,6 +2,11 @@
 // Package command does: a zip holding a re-serialized manifest.json (one per
 // host) plus every other file in the plugin folder except dotfiles.
 // Run via `npm run package` (which runs check and build first).
+//
+// Marketplace builds: the Adobe Developer Distribution portal assigns a plugin
+// ID that must replace the manifest id. Pass it without editing manifest.json:
+//   npm run package -- --id <portal-plugin-id>
+// (or set PLUGIN_ID). The GitHub build keeps the id from manifest.json.
 const { spawnSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
@@ -35,7 +40,46 @@ if (!fs.existsSync(path.join(dist, "manifest.json"))) {
   fail("dist/manifest.json is missing. Run npm run build first.");
 }
 
+function getIdOverride(argv) {
+  const index = argv.indexOf("--id");
+
+  if (index !== -1) {
+    const value = argv[index + 1];
+
+    if (!value || value.startsWith("--")) {
+      fail("--id needs a value, for example: npm run package -- --id <portal-plugin-id>");
+    }
+
+    return value;
+  }
+
+  const inline = argv.find(function (arg) {
+    return arg.startsWith("--id=");
+  });
+
+  if (inline) {
+    const value = inline.slice("--id=".length).trim();
+
+    if (!value) {
+      fail("--id needs a value, for example: npm run package -- --id <portal-plugin-id>");
+    }
+
+    return value;
+  }
+
+  return process.env.PLUGIN_ID || "";
+}
+
 const manifest = JSON.parse(fs.readFileSync(path.join(dist, "manifest.json"), "utf8"));
+const idOverride = getIdOverride(process.argv.slice(2)).trim();
+
+if (idOverride) {
+  if (!/^[A-Za-z0-9._-]+$/.test(idOverride)) {
+    fail("plugin id may only contain letters, numbers, dots, dashes and underscores: " + idOverride);
+  }
+
+  manifest.id = idOverride;
+}
 const hosts = Array.isArray(manifest.host) ? manifest.host : [manifest.host];
 const files = listFiles(dist, "").filter(function (file) {
   return file !== "manifest.json" && !file.endsWith(".ccx");
@@ -76,7 +120,11 @@ hosts.forEach(function (host) {
       fail("zip exited with status " + result.status);
     }
 
-    console.log("Packaged Phrase Selects " + manifest.version + " for " + host.app + ": release/" + ccxName);
+    console.log(
+      "Packaged Phrase Selects " + manifest.version + " for " + host.app +
+      (idOverride ? " with plugin id " + idOverride : "") +
+      ": release/" + ccxName
+    );
   } finally {
     fs.rmSync(staging, { recursive: true, force: true });
   }

@@ -402,7 +402,7 @@
 
     try {
       if (!premiere || typeof premiere.getSourceContext !== "function") {
-        throw new Error("Phrase Selects Premiere adapter is not loaded. Reload the plugin in UXP Developer Tool.");
+        throw new Error(LOAD_FAILED_MESSAGE);
       }
 
       var context = await premiere.getSourceContext();

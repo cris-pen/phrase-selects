@@ -2,6 +2,17 @@
 
 Phrase Selects is a Premiere Pro UXP panel that searches the transcript for one selected clip or sequence, previews matching phrase ranges, then creates subclips and optionally assembles those generated subclips into a continuous sequence.
 
+## Install
+
+1. Download the `.ccx` from the [latest GitHub release](https://github.com/cris-pen/phrase-selects/releases/latest) and double-click it. Creative Cloud installs it, after a warning that the plugin isn't from the Marketplace.
+2. In Adobe Premiere 26.3 or later, open Window > UXP Plugins > Phrase Selects.
+3. Transcribe a clip (Window > Text, then the Transcript tab), select it in the Project panel, and click Use Selected Clip.
+4. Search for a word or phrase, review the matches, and click Create Outputs.
+
+Install from one place only: a Marketplace install and a GitHub install use different plugin IDs, so having both shows two Phrase Selects panels.
+
+See [PRIVACY.md](PRIVACY.md) for what the plugin reads and stores. It has no network access.
+
 ## Current Architecture
 
 The v1 pipeline is:
@@ -29,6 +40,8 @@ The sequence path intentionally uses generated subclips as the intermediate repr
 - `scripts/runtime-files.js`: Works out which files the plugin needs at runtime (shared by check and build).
 - `icons/`: Plugin icon PNGs referenced by `manifest.json` (24 px and 48 px).
 - `design/icon/`: Icon source artwork (SVG master, 512 px PNG for listings, and a one-color 24 px glyph). Not shipped in the plugin.
+- `listing/`: Adobe Marketplace listing copy (`LISTING.md`), listing icons, publisher logo, and screenshots. Not shipped in the plugin.
+- `PRIVACY.md`: Privacy policy, linked from the Marketplace listing.
 - `RELEASE.md`: Checklist for packaging and publishing a `.ccx` installer.
 - `CHANGELOG.md`: Versioned release notes.
 
@@ -58,6 +71,16 @@ This runs `npm run check` and `npm run build`, then zips `dist/` into `release/c
 
 Then follow `RELEASE.md` to install the generated `.ccx` locally, smoke test it in Premiere, and upload the tested `.ccx` to the GitHub Release.
 
+### Adobe Marketplace build
+
+The Adobe Developer Distribution portal assigns each listing its own plugin ID, and the `.ccx` uploaded there must use it. Pass it to the packager instead of editing `manifest.json`:
+
+```bash
+npm run package -- --id <portal-plugin-id>
+```
+
+This writes `release/<portal-plugin-id>_premierepro.ccx` with only the manifest `id` changed (`PLUGIN_ID=<portal-plugin-id> npm run package` works too). The GitHub build keeps `com.crispenstanbach.phrase-selects`, as Adobe recommends using separate IDs for the Marketplace and other channels. Listing copy and assets are in `listing/LISTING.md`, and the submission steps are in `RELEASE.md`.
+
 ## Source Locking
 
 The panel locks the searched source and transcript until Use Selected Clip is clicked again. This lets repeated searches keep using the original clip or sequence even after Premiere focuses a generated selects sequence.
@@ -66,7 +89,7 @@ The panel locks the searched source and transcript until Use Selected Clip is cl
 
 Sequence source support is experimental. The panel can now use a selected Project panel sequence, or the active sequence when nothing else is selected, as the transcript source. This is intended for searching compiled timelines that contain footage from multiple original media files.
 
-Premiere exposes sequences through `Sequence.getProjectItem()` and sequence project items through `ClipProjectItem`, so this build attempts the same transcript and subclip pipeline used for normal clips. If Premiere rejects subclip creation from a sequence source, the panel will report that sequence-specific output creation needs a fallback path.
+Premiere exposes sequences through `Sequence.getProjectItem()` and sequence project items through `ClipProjectItem`, so this build attempts the same transcript and subclip pipeline used for normal clips. If Premiere rejects subclip creation from a sequence source, the panel says that creating outputs from a sequence is experimental and suggests using the original clips instead.
 
 ## Search Syntax
 
@@ -213,8 +236,8 @@ The most likely live-testing adjustment is transcript JSON parsing, since export
 
 - [Premiere UXP API overview](https://developer.adobe.com/premiere-pro/uxp/)
 - [UXP manifest reference](https://developer.adobe.com/premiere-pro/uxp/plugins/concepts/manifest/)
-- [UXP packaging guide](https://developer.adobe.com/photoshop/uxp/2022/guides/distribution/packaging-your-plugin/)
-- [UXP distribution options](https://developer.adobe.com/photoshop/uxp/2022/guides/distribution/distribution-options/)
+- [Premiere UXP packaging](https://developer.adobe.com/premiere-pro/uxp/plugins/distribution/package/)
+- [Premiere UXP Marketplace distribution](https://developer.adobe.com/premiere-pro/uxp/plugins/distribution/adobe-marketplace/)
 - [Premiere DOM API overview](https://developer.adobe.com/premiere-pro/uxp/ppro-reference/)
 - [Transcript API](https://developer.adobe.com/premiere-pro/uxp/ppro-reference/classes/transcript)
 - [ClipProjectItem API](https://developer.adobe.com/premiere-pro/uxp/ppro-reference/classes/clipprojectitem)

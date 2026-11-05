@@ -1,6 +1,6 @@
 # Release Checklist
 
-Use this checklist when publishing Phrase Selects to GitHub or sharing an installer file.
+Use this checklist when publishing Phrase Selects to GitHub, sharing an installer file, or submitting to the Adobe Marketplace.
 
 ## Before Packaging
 
@@ -43,8 +43,31 @@ You can still package with UXP Developer Tool instead: Add Plugin, select `dist/
 4. Include the supported Premiere version from `manifest.json`.
 5. Include a short note that local installs show Adobe's unverified-plugin warning until the plugin is submitted through Adobe's distribution process.
 
+## Adobe Marketplace Release
+
+Listing copy, limits and asset files are in `listing/LISTING.md`.
+
+First submission:
+
+1. Sign in at <https://developer.adobe.com/distribute/home> with your Adobe ID and fill in the publisher profile. You get one edit before approval, so check it carefully.
+2. Create New Listing > Creative Cloud desktop plugin > Premiere Pro, and copy the plugin ID the portal shows.
+3. Build the Marketplace package with that ID:
+
+```bash
+npm run package -- --id <portal-plugin-id>
+```
+
+4. Install `release/<portal-plugin-id>_premierepro.ccx` locally and run the smoke checklist in `README.md`. Remove other Phrase Selects installs first.
+5. Upload the `.ccx`, fill in the listing from `listing/LISTING.md`, add the screenshots and icons, set the purchase method to Free, and submit with the note to reviewers. Adobe aims to review within 10 business days.
+
+Later versions: run the Before Packaging steps, build with the same portal ID, and upload the new `.ccx` as a new version in the portal with its release notes. The GitHub release is built separately with plain `npm run package`.
+
+If the portal rejects a package built by `scripts/package.js`, package `dist/` with UXP Developer Tool's Package command instead, after setting the portal ID in `dist/manifest.json`.
+
 ## Useful Adobe References
 
-- [Packaging Your Plugin](https://developer.adobe.com/photoshop/uxp/2022/guides/distribution/packaging-your-plugin/)
-- [Distribution Options](https://developer.adobe.com/photoshop/uxp/2022/guides/distribution/distribution-options/)
+- [Premiere UXP packaging](https://developer.adobe.com/premiere-pro/uxp/plugins/distribution/package/)
+- [Premiere UXP Marketplace distribution](https://developer.adobe.com/premiere-pro/uxp/plugins/distribution/adobe-marketplace/)
+- [Create a listing](https://developer.adobe.com/premiere-pro/uxp/plugins/distribution/listing/)
+- [Review guidelines](https://developer.adobe.com/premiere-pro/uxp/plugins/distribution/review-guidelines/)
 - [Premiere UXP Manifest](https://developer.adobe.com/premiere-pro/uxp/plugins/concepts/manifest/)

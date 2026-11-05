@@ -925,7 +925,7 @@
           }, "Create Phrase Selects Subclip " + padIndex(hit.index));
         } catch (error) {
           var sequenceHint = sourceKind === "sequence" ?
-            " The source is a sequence; if Premiere rejects sequence subclips, this build can still search the sequence transcript but output creation will need a sequence-specific fallback." :
+            " Creating outputs from a sequence is experimental, and this version of Premiere may not support it. Search still works; to create outputs, use the original clips instead." :
             "";
           throw new Error(
             "subclip creation failed for hit " +

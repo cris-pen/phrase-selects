@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `npm run package -- --id <plugin-id>` builds a `.ccx` with a different plugin ID, for the ID the Adobe Marketplace assigns.
+- Added Adobe Marketplace listing copy, icons and screenshots in `listing/`, and a privacy policy in `PRIVACY.md`.
+- Error messages no longer mention UXP Developer Tool or internal build details.
+
 ## 1.0.1
 
 - Added the plugin icon (shown in Creative Cloud's plugin list and Premiere's plugin manager). Source artwork is in `design/icon/`.
