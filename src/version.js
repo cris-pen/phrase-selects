@@ -2,7 +2,7 @@
 // Keep in sync with manifest.json via `npm run set-version <x.y.z>`;
 // `npm run check` fails if they drift.
 (function (root) {
-  var VERSION = "1.0.1";
+  var VERSION = "1.0.2";
 
   if (typeof module === "object" && module.exports) {
     module.exports = VERSION;

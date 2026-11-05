@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.2
 
 - `npm run package -- --id <plugin-id>` builds a `.ccx` with a different plugin ID, for the ID the Adobe Marketplace assigns.
 - Added Adobe Marketplace listing copy, icons and screenshots in `listing/`, and a privacy policy in `PRIVACY.md`.
