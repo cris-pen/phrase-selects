@@ -1,6 +1,6 @@
 {
   "name": "phrase-selects",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Premiere Pro UXP panel for creating phrase-based selects from transcripts.",
   "license": "MIT",

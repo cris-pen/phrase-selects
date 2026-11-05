@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.1
 
 - Added the plugin icon (shown in Creative Cloud's plugin list and Premiere's plugin manager). Source artwork is in `design/icon/`.
 
